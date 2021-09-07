@@ -1,23 +1,15 @@
-#include <ArduinoJson.h>
-
 #include <SPI.h>                                          // Подключаем библиотеку для работы с шиной SPI
 #include <nRF24L01.h>                                     // Подключаем файл настроек из библиотеки RF24
 #include <RF24.h>                                         // Подключаем библиотеку для работы с nRF24L01+
 
 //CE - 9; CSN - 10; SCK - 52; MO - 51; MI - 50;
-
-#define BUFFER_SIZE 255
-#define TRANSMITTER_BUFFER 32
-
-#define STOP_WORD_SIZE 6
-#define STOP_WORD "</END>"
+#define BUFFER_SIZE 16
 
 RF24           radio(9, 10);                              // Создаём объект radio для работы с библиотекой RF24, указывая номера выводов nRF24L01+ (CE, CSN)
 unsigned long  data = 0;                                      // Создаём массив для приёма данных
 unsigned int  temp = 24;
 unsigned int humidity = 72;
 unsigned int id = 0;
-char transmitEnd[STOP_WORD_SIZE] = STOP_WORD;
 
 void setup(){
     Serial.begin(9600);
@@ -34,48 +26,12 @@ void loop(){
   if (millis() - data >= 1000){
     data = millis();
     Serial.print("Send: ");
-
-    StaticJsonDocument<BUFFER_SIZE> doc;
-    JsonObject root = doc.to<JsonObject>();
     
-    root["id"] = id;
-    JsonObject data = root.createNestedObject("data");
-    data["temp"] = temp;
-    data["humidity"] = humidity;
-    
-    char json[BUFFER_SIZE];
-    serializeJson(doc, json);
-    
-    RadioWriteWholeString(json, strlen(json));                     // отправляем данные из массива data указывая сколько байт массива мы хотим отправить. Отправить данные можно с проверкой их доставки: if( radio.write(&data, sizeof(data)) ){данные приняты приёмником;}else{данные не приняты приёмником;}
+    int transmittedData[BUFFER_SIZE];
+    transmittedData[0] = id;
+    transmittedData[1] = temp;
+    transmittedData[2] = humidity;
+    Serial.println(sizeof(transmittedData));
+    radio.write(&transmittedData, sizeof(transmittedData));
   }
-}
-
-void RadioWriteWholeString(char * string, int strlength) {
-  int lastStep = 0;
-  int lenght = strlength;
-  
-  Serial.println(0);
-  
-  while(lastStep < strlength) {
-    int lastIndex = min(lastStep + TRANSMITTER_BUFFER, strlength - 1);
-    
-    char transmittedString[TRANSMITTER_BUFFER];
-    strcpy(transmittedString, substr(string, lastStep, lastIndex));
-    
-    radio.write(&transmittedString, sizeof(transmittedString));
-    Serial.print(transmittedString);
-    lastStep += TRANSMITTER_BUFFER;
-  }
-  
-  radio.write(&transmitEnd, sizeof(transmitEnd));
-  Serial.println();
-}
-
-char* substr(char* arr, int begin, int len)
-{
-    char* res = new char[len + 1];
-    for (int i = 0; i < len; i++)
-        res[i] = *(arr + begin + i);
-    res[len] = 0;
-    return res;
 }
